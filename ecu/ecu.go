@@ -29,6 +29,19 @@ func (e ECUData) GetFeatureValue(feature int) int {
 	}
 }
 
+func (c ECUData) GetFeatureName(feature int) string {
+	switch feature {
+	case 0:
+		return "rpm"
+	case 1:
+		return "gear"
+	case 2:
+		return "speed"
+	default:
+		return ""
+	}
+}
+
 func (e ECUData) GetFeatureCount() int {
 	return 3 // RPM, Gear, Speed
 }
@@ -65,4 +78,22 @@ func CreateECUData(values []string) (ml.FeatureProvider, error) {
 		Speed:    speed,
 		IsAttack: status == 1,
 	}, nil
+}
+
+func GetSequentialAnomalyDetector() *ml.WindowDetector {
+
+	detector := ml.NewWindowDetector(3)
+
+	configs := CreateECUConfigs()
+	for _, config := range configs {
+		detector.AddFeatureConfig(config)
+	}
+
+	// Gunakan
+	// isAnomaly, err := detector.AddData(yourData)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	return detector
 }

@@ -12,10 +12,18 @@ import (
 	"math/rand"
 )
 
-type FeatureProvider interface {
+type HasAnomaly interface {
 	IsAnomaly() bool
+}
+
+type HasValueCount interface {
 	GetFeatureValue(feature int) int
 	GetFeatureCount() int
+}
+
+type FeatureProvider interface {
+	HasAnomaly
+	HasValueCount
 }
 
 type DataFactory func(values []string) (FeatureProvider, error)
