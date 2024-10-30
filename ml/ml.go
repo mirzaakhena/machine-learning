@@ -13,12 +13,16 @@ import (
 	"math/rand"
 )
 
-// Struktur data untuk ECU
+// type DataWithAnomalyField interface {
+// 	IsAnomaly() bool
+// }
+
 type ECUData struct {
-	RPM      int
-	Gear     int
-	Speed    int
-	IsAttack bool // true jika status=1
+	isAttack bool // true jika status=1
+}
+
+func (e ECUData) IsAnomaly() bool {
+	return e.isAttack
 }
 
 // Struktur data untuk tree
@@ -247,15 +251,15 @@ func splitDataset(dataset []ECUData, feature int, threshold int) (left []ECUData
 }
 
 // Fungsi untuk prediksi
-func Predict(node *Node, data ECUData) bool {
+func (node *Node) Predict(data ECUData) bool {
 	if node.IsLeaf {
 		return node.Prediction
 	}
 
 	if getFeatureValue(data, node.Feature) <= node.Threshold {
-		return Predict(node.Left, data)
+		return node.Left.Predict(data)
 	}
-	return Predict(node.Right, data)
+	return node.Right.Predict(data)
 }
 
 // Fungsi untuk split data menjadi training dan testing
@@ -282,7 +286,7 @@ func SplitTrainTest(dataset []ECUData, trainRatio float64) (train []ECUData, tes
 }
 
 // Fungsi untuk save model ke file
-func SaveModel(model *DecisionTreeModel, filename string) error {
+func SaveModel(node *Node, filename string) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -290,11 +294,11 @@ func SaveModel(model *DecisionTreeModel, filename string) error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	return encoder.Encode(model.Root)
+	return encoder.Encode(node)
 }
 
 // Fungsi untuk load model dari file
-func LoadModel(filename string) (*DecisionTreeModel, error) {
+func LoadModel(filename string) (*Node, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -307,7 +311,7 @@ func LoadModel(filename string) (*DecisionTreeModel, error) {
 		return nil, err
 	}
 
-	return &DecisionTreeModel{Root: &root}, nil
+	return &root, nil
 }
 
 func PrintTree(node *Node, prefix string, isLeft bool) {
@@ -349,7 +353,7 @@ func GetPredictionAccuration(testData []ECUData, tree *Node) float64 {
 
 	correct := 0
 	for _, data := range testData {
-		prediction := Predict(tree, data)
+		prediction := tree.Predict(data)
 		if prediction == data.IsAttack {
 			correct++
 		}

@@ -22,7 +22,7 @@ func main() {
 		panic(err)
 	}
 
-	accuracy := ml.GetPredictionAccuration(dataset, tree.Root)
+	accuracy := ml.GetPredictionAccuration(dataset, tree)
 	fmt.Printf("Accuracy: %.2f%%\n", accuracy)
 
 }
@@ -51,21 +51,7 @@ func runMLForTraining(fileTraining, fileModel string) {
 	accuracy := ml.GetPredictionAccuration(testData, tree)
 	fmt.Printf("Accuracy: %.2f%%\n", accuracy*100)
 
-	model := &ml.DecisionTreeModel{Root: tree}
-	ml.SaveModel(model, fileModel)
+	ml.SaveModel(tree, fileModel)
 
 	ml.PrintTree(tree, "", true)
-}
-
-func runMLForPredict(filename string) func(data ml.ECUData) bool {
-
-	loadedModel, err := ml.LoadModel(filename)
-	if err != nil {
-		panic(err)
-	}
-
-	return func(data ml.ECUData) bool {
-		return loadedModel.Predict(data)
-	}
-
 }

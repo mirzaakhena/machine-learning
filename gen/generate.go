@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"time"
 )
 
 // VehicleData represents a single row of vehicle data
@@ -174,31 +173,4 @@ func max(a, b int) int {
 		return a
 	}
 	return b
-}
-
-func main() {
-	// Set random seed
-	rand.Seed(time.Now().UnixNano())
-
-	// Create generator
-	generator := NewGenerator()
-
-	// Generate 100 rows (50 normal, 50 anomaly)
-	data := generator.GenerateData(50, 50)
-
-	// Save to CSV
-	err := SaveToCSV(data, "vehicle_data.csv")
-	if err != nil {
-		fmt.Printf("Error saving to CSV: %v\n", err)
-		return
-	}
-
-	// Print preview of the data
-	fmt.Println("rpm,gear,speed,status")
-	for i, row := range data {
-		if i < 10 { // Print first 10 rows as preview
-			fmt.Printf("%d,%d,%d,%d\n", row.RPM, row.Gear, row.Speed, row.Status)
-		}
-	}
-	fmt.Printf("... (total %d rows generated)\n", len(data))
 }
