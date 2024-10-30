@@ -9,9 +9,13 @@ import (
 
 func main() {
 
-	// generateData("./data/large_dataset2.csv")
+	// generate to create model
+	// generateData("./data/large_dataset.csv")
 	// generateModel("./data/large_dataset.csv", "./data/model.json")
-	getPredictionAccuration("./data/model.json", "./data/large_dataset2.csv")
+
+	// generate to predict data
+	// generateData("./data/large_dataset2.csv")
+	// getPredictionAccuration("./data/model.json", "./data/large_dataset2.csv")
 
 }
 
