@@ -2,28 +2,19 @@ package ml
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
-	"strconv"
 	"strings"
-	"time"
-
-	"math/rand"
 )
 
-// type DataWithAnomalyField interface {
-// 	IsAnomaly() bool
-// }
-
-type ECUData struct {
-	isAttack bool // true jika status=1
+type FeatureProvider interface {
+	IsAnomaly() bool
+	GetFeatureValue(feature int) int
+	GetFeatureCount() int
 }
 
-func (e ECUData) IsAnomaly() bool {
-	return e.isAttack
-}
+type DataFactory func(values []string) (FeatureProvider, error)
 
 // Struktur data untuk tree
 type Node struct {
@@ -36,7 +27,7 @@ type Node struct {
 }
 
 // Load data dari CSV
-func LoadDataFromCSV(filename string) ([]ECUData, error) {
+func LoadDataFromCSV(filename string, createData DataFactory) ([]FeatureProvider, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -50,23 +41,16 @@ func LoadDataFromCSV(filename string) ([]ECUData, error) {
 		return nil, err
 	}
 
-	var dataset []ECUData
+	var dataset []FeatureProvider
 	for {
 		record, err := reader.Read()
 		if err != nil {
 			break // End of file
 		}
 
-		rpm, _ := strconv.Atoi(record[0])
-		gear, _ := strconv.Atoi(record[1])
-		speed, _ := strconv.Atoi(record[2])
-		status, _ := strconv.Atoi(record[3])
-
-		data := ECUData{
-			RPM:      rpm,
-			Gear:     gear,
-			Speed:    speed,
-			IsAttack: status == 1,
+		data, err := createData(record)
+		if err != nil {
+			return nil, fmt.Errorf("error creating data at row: %v", err)
 		}
 		dataset = append(dataset, data)
 	}
@@ -74,33 +58,8 @@ func LoadDataFromCSV(filename string) ([]ECUData, error) {
 	return dataset, nil
 }
 
-// Fungsi untuk mendapatkan nilai feature berdasarkan index
-func getFeatureValue(data ECUData, feature int) int {
-	switch feature {
-	case 0:
-		return data.RPM
-	case 1:
-		return data.Gear
-	case 2:
-		return data.Speed
-	default:
-		return 0
-	}
-}
-
-// Hitung proporsi attack dalam dataset
-func calculateAttackProportion(dataset []ECUData) float64 {
-	attackCount := 0
-	for _, data := range dataset {
-		if data.IsAttack {
-			attackCount++
-		}
-	}
-	return float64(attackCount) / float64(len(dataset))
-}
-
 // Fungsi untuk membangun tree
-func BuildTree(dataset []ECUData, depth int, maxDepth int) *Node {
+func BuildTree(dataset []FeatureProvider, depth int, maxDepth int) *Node {
 	// Log indentasi untuk visualisasi kedalaman
 	indent := strings.Repeat("  ", depth)
 
@@ -176,145 +135,45 @@ func BuildTree(dataset []ECUData, depth int, maxDepth int) *Node {
 	return node
 }
 
-// Fungsi untuk mencari split terbaik
-func findBestSplit(dataset []ECUData) (bestFeature int, bestThreshold int, bestGain float64) {
-	bestGain = 0
-
-	// Untuk setiap feature (RPM, Gear, Speed)
-	for feature := 0; feature < 3; feature++ {
-		// Cari nilai unik untuk feature ini
-		values := make(map[int]bool)
-		for _, data := range dataset {
-			values[getFeatureValue(data, feature)] = true
-		}
-
-		// Untuk setiap nilai possible threshold
-		for threshold := range values {
-			gain := calculateInformationGain(dataset, feature, threshold)
-			if gain > bestGain {
-				bestGain = gain
-				bestFeature = feature
-				bestThreshold = threshold
-			}
-		}
-	}
-
-	return
-}
-
-// Fungsi untuk menghitung information gain
-func calculateInformationGain(dataset []ECUData, feature int, threshold int) float64 {
-	parentEntropy := calculateEntropy(dataset)
-
-	leftData, rightData := splitDataset(dataset, feature, threshold)
-
-	// Hitung weighted entropy setelah split
-	leftWeight := float64(len(leftData)) / float64(len(dataset))
-	rightWeight := float64(len(rightData)) / float64(len(dataset))
-
-	leftEntropy := calculateEntropy(leftData)
-	rightEntropy := calculateEntropy(rightData)
-
-	weightedEntropy := leftWeight*leftEntropy + rightWeight*rightEntropy
-
-	return parentEntropy - weightedEntropy
-}
-
-// Fungsi untuk menghitung entropy
-func calculateEntropy(dataset []ECUData) float64 {
-	if len(dataset) == 0 {
-		return 0
-	}
-
-	attackProp := calculateAttackProportion(dataset)
-	if attackProp == 0 || attackProp == 1 {
-		return 0
-	}
-
-	return -attackProp*log2(attackProp) - (1-attackProp)*log2(1-attackProp)
-}
-
-func log2(x float64) float64 {
-	return math.Log(x) / math.Log(2)
-}
-
-// Fungsi untuk split dataset
-func splitDataset(dataset []ECUData, feature int, threshold int) (left []ECUData, right []ECUData) {
+// Hitung proporsi attack dalam dataset
+func calculateAttackProportion(dataset []FeatureProvider) float64 {
+	attackCount := 0
 	for _, data := range dataset {
-		if getFeatureValue(data, feature) <= threshold {
-			left = append(left, data)
-		} else {
-			right = append(right, data)
+		if data.IsAnomaly() {
+			attackCount++
 		}
 	}
-	return
+	return float64(attackCount) / float64(len(dataset))
 }
 
 // Fungsi untuk prediksi
-func (node *Node) Predict(data ECUData) bool {
+func (node *Node) Predict(data FeatureProvider) bool {
 	if node.IsLeaf {
 		return node.Prediction
 	}
 
-	if getFeatureValue(data, node.Feature) <= node.Threshold {
+	if data.GetFeatureValue(node.Feature) <= node.Threshold {
+		// if getFeatureValue(data, node.Feature) <= node.Threshold {
 		return node.Left.Predict(data)
 	}
 	return node.Right.Predict(data)
 }
 
-// Fungsi untuk split data menjadi training dan testing
-func SplitTrainTest(dataset []ECUData, trainRatio float64) (train []ECUData, test []ECUData) {
-	// Buat copy dataset dan shuffle
-	shuffled := make([]ECUData, len(dataset))
-	copy(shuffled, dataset)
+func (node *Node) GetPredictionAccuration(testData []FeatureProvider) float64 {
 
-	// Shuffle menggunakan Fisher-Yates algorithm
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	for i := len(shuffled) - 1; i > 0; i-- {
-		j := r.Intn(i + 1)
-		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	correct := 0
+	for _, data := range testData {
+		prediction := node.Predict(data)
+		if prediction == data.IsAnomaly() {
+			correct++
+		}
 	}
 
-	// Hitung split point
-	splitPoint := int(float64(len(dataset)) * trainRatio)
-
-	// Split data
-	train = shuffled[:splitPoint]
-	test = shuffled[splitPoint:]
-
-	return
+	accuracy := float64(correct) / float64(len(testData))
+	return accuracy * 100
 }
 
-// Fungsi untuk save model ke file
-func SaveModel(node *Node, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(node)
-}
-
-// Fungsi untuk load model dari file
-func LoadModel(filename string) (*Node, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var root Node
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&root); err != nil {
-		return nil, err
-	}
-
-	return &root, nil
-}
-
-func PrintTree(node *Node, prefix string, isLeft bool) {
+func (node *Node) PrintTree(prefix string, isLeft bool) {
 	if node == nil {
 		return
 	}
@@ -345,20 +204,82 @@ func PrintTree(node *Node, prefix string, isLeft bool) {
 		newPrefix += "    "
 	}
 
-	PrintTree(node.Left, newPrefix, true)
-	PrintTree(node.Right, newPrefix, false)
+	node.Left.PrintTree(newPrefix, true)
+	node.Right.PrintTree(newPrefix, false)
 }
 
-func GetPredictionAccuration(testData []ECUData, tree *Node) float64 {
+// Fungsi untuk mencari split terbaik
+func findBestSplit(dataset []FeatureProvider) (bestFeature int, bestThreshold int, bestGain float64) {
+	bestGain = 0
 
-	correct := 0
-	for _, data := range testData {
-		prediction := tree.Predict(data)
-		if prediction == data.IsAttack {
-			correct++
+	// Untuk setiap feature (RPM, Gear, Speed)
+	for feature := 0; feature < 3; feature++ {
+		// Cari nilai unik untuk feature ini
+		values := make(map[int]bool)
+		for _, data := range dataset {
+			// values[  getFeatureValue(data, feature)] = true
+			values[data.GetFeatureValue(feature)] = true
+		}
+
+		// Untuk setiap nilai possible threshold
+		for threshold := range values {
+			gain := calculateInformationGain(dataset, feature, threshold)
+			if gain > bestGain {
+				bestGain = gain
+				bestFeature = feature
+				bestThreshold = threshold
+			}
 		}
 	}
 
-	accuracy := float64(correct) / float64(len(testData))
-	return accuracy * 100
+	return
+}
+
+// Fungsi untuk menghitung information gain
+func calculateInformationGain(dataset []FeatureProvider, feature int, threshold int) float64 {
+	parentEntropy := calculateEntropy(dataset)
+
+	leftData, rightData := splitDataset(dataset, feature, threshold)
+
+	// Hitung weighted entropy setelah split
+	leftWeight := float64(len(leftData)) / float64(len(dataset))
+	rightWeight := float64(len(rightData)) / float64(len(dataset))
+
+	leftEntropy := calculateEntropy(leftData)
+	rightEntropy := calculateEntropy(rightData)
+
+	weightedEntropy := leftWeight*leftEntropy + rightWeight*rightEntropy
+
+	return parentEntropy - weightedEntropy
+}
+
+// Fungsi untuk menghitung entropy
+func calculateEntropy(dataset []FeatureProvider) float64 {
+	if len(dataset) == 0 {
+		return 0
+	}
+
+	attackProp := calculateAttackProportion(dataset)
+	if attackProp == 0 || attackProp == 1 {
+		return 0
+	}
+
+	return -attackProp*log2(attackProp) - (1-attackProp)*log2(1-attackProp)
+}
+
+func log2(x float64) float64 {
+	return math.Log(x) / math.Log(2)
+}
+
+// Fungsi untuk split dataset
+func splitDataset(dataset []FeatureProvider, feature int, threshold int) (left []FeatureProvider, right []FeatureProvider) {
+	for _, data := range dataset {
+		// if getFeatureValue(data, feature) <= threshold {
+		if data.GetFeatureValue(feature) <= threshold {
+			left = append(left, data)
+		} else {
+			right = append(right, data)
+		}
+	}
+	return
 }

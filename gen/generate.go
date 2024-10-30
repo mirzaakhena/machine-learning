@@ -9,10 +9,11 @@ import (
 
 // VehicleData represents a single row of vehicle data
 type VehicleData struct {
-	RPM    int
-	Gear   int
-	Speed  int
-	Status int
+	RPM         int
+	Gear        int
+	Speed       int
+	Status      int
+	Description string
 }
 
 // Generator contains methods for generating vehicle data
@@ -42,10 +43,11 @@ func (g *Generator) generateNormalCase() *VehicleData {
 	rpm := rand.Intn(maxRPM-minRPM+1) + minRPM
 
 	return &VehicleData{
-		RPM:    rpm,
-		Gear:   gear,
-		Speed:  speed,
-		Status: 0,
+		RPM:         rpm,
+		Gear:        gear,
+		Speed:       speed,
+		Status:      0,
+		Description: "normal",
 	}
 }
 
@@ -57,40 +59,45 @@ func (g *Generator) generateAnomalyCase() *VehicleData {
 	switch anomalyType {
 	case 1: // Over-revving
 		data = VehicleData{
-			RPM:    rand.Intn(1500) + 5501, // 5501-7000
-			Gear:   rand.Intn(3) + 1,       // 1-3
-			Speed:  rand.Intn(100) + 20,    // 20-120
-			Status: 1,
+			RPM:         rand.Intn(1500) + 5501, // 5501-7000
+			Gear:        rand.Intn(3) + 1,       // 1-3
+			Speed:       rand.Intn(100) + 20,    // 20-120
+			Status:      1,
+			Description: "Over-revving",
 		}
 	case 2: // Stalling
 		data = VehicleData{
-			RPM:    rand.Intn(400) + 400, // 400-799
-			Gear:   rand.Intn(5) + 1,     // 1-5
-			Speed:  rand.Intn(21) + 10,   // 10-30
-			Status: 1,
+			RPM:         rand.Intn(400) + 400, // 400-799
+			Gear:        rand.Intn(5) + 1,     // 1-5
+			Speed:       rand.Intn(21) + 10,   // 10-30
+			Status:      1,
+			Description: "Stalling",
 		}
 	case 3: // Gear-speed mismatch
 		gear := rand.Intn(2) + 1 // 1-2
 		data = VehicleData{
-			RPM:    rand.Intn(2000) + 2000, // 2000-4000
-			Gear:   gear,
-			Speed:  rand.Intn(71) + 50 + gear*50, // 50-120
-			Status: 1,
+			RPM:         rand.Intn(2000) + 2000, // 2000-4000
+			Gear:        gear,
+			Speed:       rand.Intn(71) + 50 + gear*50, // 50-120
+			Status:      1,
+			Description: "Gear-speed mismatch",
 		}
 	case 4: // Neutral with speed
 		data = VehicleData{
-			RPM:    rand.Intn(2200) + 800, // 800-3000
-			Gear:   0,                     // Neutral
-			Speed:  rand.Intn(61) + 20,    // 20-80
-			Status: 1,
+			RPM:         rand.Intn(2200) + 800, // 800-3000
+			Gear:        0,                     // Neutral
+			Speed:       rand.Intn(61) + 20,    // 20-80
+			Status:      1,
+			Description: "Neutral with speed",
 		}
 	case 5: // RPM too low for speed-gear
 		gear := rand.Intn(3) + 3 // 3-5
 		data = VehicleData{
-			RPM:    rand.Intn(701) + 800, // 800-1500
-			Gear:   gear,
-			Speed:  rand.Intn(16) + gear*30, // Higher speed for gear
-			Status: 1,
+			RPM:         rand.Intn(701) + 800, // 800-1500
+			Gear:        gear,
+			Speed:       rand.Intn(16) + gear*30, // Higher speed for gear
+			Status:      1,
+			Description: "RPM too low for speed-gear",
 		}
 	}
 
@@ -141,7 +148,7 @@ func SaveToCSV(data []VehicleData, filename string) error {
 	defer writer.Flush()
 
 	// Write header
-	if err := writer.Write([]string{"rpm", "gear", "speed", "status"}); err != nil {
+	if err := writer.Write([]string{"rpm", "gear", "speed", "status", "description"}); err != nil {
 		return err
 	}
 
@@ -152,6 +159,7 @@ func SaveToCSV(data []VehicleData, filename string) error {
 			fmt.Sprintf("%d", row.Gear),
 			fmt.Sprintf("%d", row.Speed),
 			fmt.Sprintf("%d", row.Status),
+			row.Description,
 		}); err != nil {
 			return err
 		}

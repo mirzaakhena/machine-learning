@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ecu"
 	"fmt"
 	"gen"
 	"ml"
@@ -8,35 +9,27 @@ import (
 
 func main() {
 
-	// generateData("./data/large_dataset_2.csv")
+	// generateData("./data2/large_dataset2.csv")
 
-	// runMLForTraining("./data/large_dataset.csv", "./data/model.json")
+	// runMLForTraining("./data2/large_dataset.csv", "./data2/model.json")
 
-	tree, err := ml.LoadModel("./data/model.json")
-	if err != nil {
-		panic(err)
-	}
-
-	dataset, err := ml.LoadDataFromCSV("./data/large_dataset_2.csv")
-	if err != nil {
-		panic(err)
-	}
-
-	accuracy := ml.GetPredictionAccuration(dataset, tree)
-	fmt.Printf("Accuracy: %.2f%%\n", accuracy)
+	getPredictionAccuration("./data2/model.json", "./data2/large_dataset2.csv")
 
 }
 
 func generateData(rawFile string) {
 	generator := gen.NewGenerator()
-	data := generator.GenerateData(800, 200)
-	gen.SaveToCSV(data, rawFile)
+	data := generator.GenerateData(1600, 400)
+	err := gen.SaveToCSV(data, rawFile)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func runMLForTraining(fileTraining, fileModel string) {
 
 	// Load data
-	dataset, err := ml.LoadDataFromCSV(fileTraining)
+	dataset, err := ml.LoadDataFromCSV(fileTraining, ecu.CreateECUData)
 	if err != nil {
 		panic(err)
 	}
@@ -54,4 +47,18 @@ func runMLForTraining(fileTraining, fileModel string) {
 	ml.SaveModel(tree, fileModel)
 
 	ml.PrintTree(tree, "", true)
+}
+
+func getPredictionAccuration(fileModel, fileData string) {
+	tree, err := ml.LoadModel(fileModel)
+	if err != nil {
+		panic(err)
+	}
+
+	dataset, err := ml.LoadDataFromCSV(fileData, ecu.CreateECUData)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Accuracy: %.2f%%\n", tree.GetPredictionAccuration(dataset))
 }
